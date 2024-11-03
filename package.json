@@ -1,0 +1,8 @@
+{
+    "name": "softbody-pbd",
+    "version": "1.0.0",
+    "displayName": "Softbody PBD",
+    "unity": "2022.3",
+    "description": "Position based dynamics softbody.",
+    "author": "mdlka"
+  }
