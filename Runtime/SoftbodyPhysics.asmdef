@@ -1,6 +1,6 @@
 {
-    "name": "SoftbodyPBD",
-    "rootNamespace": "SoftbodyPBD",
+    "name": "SoftbodyPhysics",
+    "rootNamespace": "SoftbodyPhysics",
     "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
