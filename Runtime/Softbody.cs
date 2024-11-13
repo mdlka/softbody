@@ -101,11 +101,11 @@ namespace SoftbodyPhysics
 
         private void ProjectConstraints(int iteration)
         {
-            foreach (var pair in _distance)
-                ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
-            
             foreach (var contact in _contacts)
                 ApplyCollisionConstraint(contact);
+            
+            foreach (var pair in _distance)
+                ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
         }
         
         private void GenerateCollisionConstraints()
