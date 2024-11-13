@@ -10,6 +10,7 @@ namespace SoftbodyPhysics
         private readonly Dictionary<(int, int), float> _distance = new();
         private readonly List<Contact> _contacts = new();
 
+        [SerializeField] private bool _needCreateObject;
         [SerializeField] private PrimitiveType _type;
         [SerializeField] private MeshRenderer _meshRenderer;
         [SerializeField] private MeshFilter _meshFilter;
@@ -35,9 +36,12 @@ namespace SoftbodyPhysics
 
         private void Awake()
         {
-            var instance = GameObject.CreatePrimitive(_type);
-            _meshFilter.mesh = instance.GetComponent<MeshFilter>().mesh;
-            Destroy(instance);
+            if (_needCreateObject)
+            {
+                var instance = GameObject.CreatePrimitive(_type);
+                _meshFilter.mesh = instance.GetComponent<MeshFilter>().mesh;
+                Destroy(instance);
+            }
             
             _positions = _meshFilter.mesh.vertices;
             _predicted = new Vector3[_positions.Length];
