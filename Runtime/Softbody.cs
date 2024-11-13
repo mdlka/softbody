@@ -8,6 +8,7 @@ namespace SoftbodyPhysics
     public class Softbody : MonoBehaviour
     {
         private readonly Dictionary<(int, int), float> _distance = new();
+        private readonly List<Contact> _contacts = new();
 
         [SerializeField] private PrimitiveType _type;
         [SerializeField] private MeshRenderer _meshRenderer;
@@ -16,12 +17,21 @@ namespace SoftbodyPhysics
         [SerializeField] private int _solverIterations;
         [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
         [SerializeField] private float _pushForce;
+        [SerializeField] private float _damping;
+        [SerializeField] private float _restCollisionDistance;
 
         private Vector3[] _positions;
         private Vector3[] _predicted;
         private Vector3[] _velocities;
         private float[] _masses;
         private float[] _invMasses;
+
+        private record Contact(int Index, Vector3 EntryPoint, Vector3 SurfaceNormal)
+        {
+            public int Index { get; } = Index;
+            public Vector3 EntryPoint { get; } = EntryPoint;
+            public Vector3 SurfaceNormal { get; } = SurfaceNormal;
+        }
 
         private void Awake()
         {
@@ -55,13 +65,13 @@ namespace SoftbodyPhysics
             for (int i = 0; i < _positions.Length; i++)
                 _velocities[i] += deltaTime * _invMasses[i] * _gravity;
 
-            DampVelocity();
+            DampVelocity(deltaTime);
 
             // Estimates for new locations of the vertices
             for (int i = 0; i < _positions.Length; i++)
                 _predicted[i] = _positions[i] + deltaTime * _velocities[i];
-            
-            // TODO: I skip a step (8) in paper because I don't need collisions for now
+
+            GenerateCollisionConstraints();
             
             for (int i = 0; i < _solverIterations; i++)
                 ProjectConstraints(i + 1);
@@ -72,7 +82,7 @@ namespace SoftbodyPhysics
                 _positions[i] = _predicted[i];
             }
 
-            UpdateVelocity();
+            UpdateVelocity(deltaTime);
             
             _meshFilter.mesh.SetVertices(_positions);
         }
@@ -88,20 +98,44 @@ namespace SoftbodyPhysics
         private void ProjectConstraints(int iteration)
         {
             foreach (var pair in _distance)
-                ApplyDistanceConstraints(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
-        }
-
-        private void DampVelocity()
-        {
-            //
+                ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
+            
+            foreach (var contact in _contacts)
+                ApplyCollisionConstraint(contact);
         }
         
-        private void UpdateVelocity()
+        private void GenerateCollisionConstraints()
         {
-            //
+            _contacts.Clear();
+
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                var path = _predicted[i] - _positions[i];
+                var ray = new Ray(_positions[i], path.normalized);
+
+                if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
+                    _contacts.Add(new Contact(i, hitInfo.point, hitInfo.normal));
+            }
         }
 
-        private void ApplyDistanceConstraints(int i1, int i2, float restLength, float stiffness)
+        private void DampVelocity(float deltaTime)
+        {
+            for (int i = 0; i < _velocities.Length; i++)
+                _velocities[i] -= _velocities[i] * _damping * deltaTime;
+        }
+        
+        private void UpdateVelocity(float deltaTime)
+        {
+            foreach (var contact in _contacts)
+            {
+                float normalVelocity = Vector3.Dot(_velocities[contact.Index], contact.SurfaceNormal);
+    
+                if (normalVelocity < 0f)
+                    _velocities[contact.Index] -= (1 + _damping) * normalVelocity * contact.SurfaceNormal;
+            }
+        }
+
+        private void ApplyDistanceConstraint(int i1, int i2, float restLength, float stiffness)
         {
             float wSum = _invMasses[i1] + _invMasses[i2];
 
@@ -116,6 +150,14 @@ namespace SoftbodyPhysics
 
             _predicted[i1] += _invMasses[i1] * correction;
             _predicted[i2] -= _invMasses[i2] * correction;
+        }
+
+        private void ApplyCollisionConstraint(Contact contact)
+        {
+            float distance = Vector3.Dot(_predicted[contact.Index] - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
+
+            if (distance < 0f) 
+                _predicted[contact.Index] += contact.SurfaceNormal * -distance;
         }
     }
 }
