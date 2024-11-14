@@ -17,6 +17,7 @@ namespace SoftbodyPhysics
         [SerializeField] private Vector3 _gravity;
         [SerializeField] private int _solverIterations;
         [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
+        [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
         [SerializeField] private float _pushForce;
         [SerializeField] private float _damping;
         [SerializeField] private float _restCollisionDistance;
@@ -26,6 +27,9 @@ namespace SoftbodyPhysics
         private Vector3[] _velocities;
         private float[] _masses;
         private float[] _invMasses;
+        
+        private Matrix4x4 _invRestMatrix;
+        private Vector3[] _restPositions;
 
         private record Contact(int Index, Vector3 EntryPoint, Vector3 SurfaceNormal)
         {
@@ -59,6 +63,43 @@ namespace SoftbodyPhysics
             for (int i = 0; i < _positions.Length; i++)
                 for (int j = i+1; j < _positions.Length; j++)
                     _distance[(i, j)] = (_positions[i] - _positions[j]).magnitude;
+            
+            // ShapeMatchingConstraint initialization
+            _invRestMatrix = Matrix4x4.identity;
+            _restPositions = new Vector3[_positions.Length];
+
+            float wsum = 0;
+            var restCm = Vector3.zero;
+            
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                restCm += _positions[i] * _masses[i];
+                wsum += _masses[i];
+            }
+
+            restCm /= wsum;
+            var A = Matrix4x4.zero;
+            
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                var q = _positions[i] - restCm;
+
+                A[0, 0] += _masses[i] * q.x * q.x;
+                A[0, 1] += _masses[i] * q.x * q.y;
+                A[0, 2] += _masses[i] * q.x * q.z;
+
+                A[1, 0] += _masses[i] * q.y * q.x;
+                A[1, 1] += _masses[i] * q.y * q.y;
+                A[1, 2] += _masses[i] * q.y * q.z;
+
+                A[2, 0] += _masses[i] * q.z * q.x;
+                A[2, 1] += _masses[i] * q.z * q.y;
+                A[2, 2] += _masses[i] * q.z * q.z;
+
+                _restPositions[i] = q;
+            }
+
+            _invRestMatrix = A.inverse;
         }
 
         private void FixedUpdate()
@@ -104,8 +145,10 @@ namespace SoftbodyPhysics
             foreach (var contact in _contacts)
                 ApplyCollisionConstraint(contact);
             
-            foreach (var pair in _distance)
-                ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
+            ApplyShapeMatchingConstraint(_shapeMatchingConstraintStiffness);
+            
+            // foreach (var pair in _distance)
+            //     ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
         }
         
         private void GenerateCollisionConstraints()
@@ -154,6 +197,50 @@ namespace SoftbodyPhysics
 
             _predicted[i1] += _invMasses[i1] * correction;
             _predicted[i2] -= _invMasses[i2] * correction;
+        }
+
+        private void ApplyShapeMatchingConstraint(float stiffness)
+        {
+            var cm = Vector3.zero;
+            float wsum = 0f;
+
+            for (int i = 0; i < _predicted.Length; i++)
+            {
+                cm += _predicted[i] * _masses[i];
+                wsum += _masses[i];
+            }
+
+            cm /= wsum;
+
+            var A = Matrix4x4.zero;
+
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                Vector3 q = _restPositions[i];
+                Vector3 p = _positions[i] - cm;
+
+                A[0, 0] += _masses[i] * p.x * q.x;
+                A[0, 1] += _masses[i] * p.x * q.y;
+                A[0, 2] += _masses[i] * p.x * q.z;
+
+                A[1, 0] += _masses[i] * p.y * q.x;
+                A[1, 1] += _masses[i] * p.y * q.y;
+                A[1, 2] += _masses[i] * p.y * q.z;
+
+                A[2, 0] += _masses[i] * p.z * q.x;
+                A[2, 1] += _masses[i] * p.z * q.y;
+                A[2, 2] += _masses[i] * p.z * q.z;
+            }
+
+            A *= _invRestMatrix;
+            
+            MatrixMath.PolarDecompositionStable(A, 1e-6f, out Matrix4x4 R);
+
+            for (int i = 0; i < _predicted.Length; i++)
+            {
+                var goal = cm + (R * _restPositions[i]).ToVector3();
+                _predicted[i] += (goal - _predicted[i]) * stiffness;
+            }
         }
 
         private void ApplyCollisionConstraint(Contact contact)
