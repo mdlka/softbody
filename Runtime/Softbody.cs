@@ -7,6 +7,12 @@ namespace SoftbodyPhysics
 {
     public class Softbody : MonoBehaviour
     {
+        private enum ConstraintType
+        {
+            Distance,
+            ShapeMatching
+        }
+        
         private readonly Dictionary<(int, int), float> _distance = new();
         private readonly List<Contact> _contacts = new();
 
@@ -16,6 +22,7 @@ namespace SoftbodyPhysics
         [SerializeField] private MeshFilter _meshFilter;
         [SerializeField] private Vector3 _gravity;
         [SerializeField] private int _solverIterations;
+        [Space, SerializeField] private ConstraintType _currentConstraint;
         [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
         [SerializeField] private float _pushForce;
@@ -144,11 +151,16 @@ namespace SoftbodyPhysics
         {
             foreach (var contact in _contacts)
                 ApplyCollisionConstraint(contact);
-            
-            ApplyShapeMatchingConstraint(_shapeMatchingConstraintStiffness);
-            
-            // foreach (var pair in _distance)
-            //     ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
+
+            if (_currentConstraint == ConstraintType.ShapeMatching)
+            {
+                ApplyShapeMatchingConstraint(_shapeMatchingConstraintStiffness);
+            }
+            else if (_currentConstraint == ConstraintType.Distance)
+            {
+                foreach (var pair in _distance) 
+                    ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
+            }
         }
         
         private void GenerateCollisionConstraints()
@@ -163,6 +175,8 @@ namespace SoftbodyPhysics
                 if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
                     _contacts.Add(new Contact(i, hitInfo.point, hitInfo.normal));
             }
+            
+            Debug.Log(_contacts.Count);
         }
 
         private void DampVelocity(float deltaTime)
@@ -189,14 +203,11 @@ namespace SoftbodyPhysics
             if (wSum == 0)
                 return;
             
-            var n = _predicted[i2] - _predicted[i1];
-            float d = n.magnitude;
-            n.Normalize();
-            
-            var correction = stiffness * n * (d - restLength) / wSum;
+            var diff = _predicted[i1] - _predicted[i2];
+            var correction = stiffness * diff.normalized * (diff.magnitude - restLength) / wSum;
 
-            _predicted[i1] += _invMasses[i1] * correction;
-            _predicted[i2] -= _invMasses[i2] * correction;
+            _predicted[i1] -= _invMasses[i1] * correction;
+            _predicted[i2] += _invMasses[i2] * correction;
         }
 
         private void ApplyShapeMatchingConstraint(float stiffness)
@@ -245,10 +256,8 @@ namespace SoftbodyPhysics
 
         private void ApplyCollisionConstraint(Contact contact)
         {
-            float distance = Vector3.Dot(_predicted[contact.Index] - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
-
-            if (distance < 0f) 
-                _predicted[contact.Index] += contact.SurfaceNormal * -distance;
+            var delta = Vector3.Dot(_predicted[contact.Index] - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
+            _predicted[contact.Index] += contact.SurfaceNormal * -delta;
         }
     }
 }
