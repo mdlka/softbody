@@ -118,4 +118,26 @@ namespace SoftbodyPhysics
             return new Vector3(vector.x, vector.y, vector.z);
         }
     }
+
+    public static class MeshMath
+    {
+        public static float ComputeVolume(Vector3[] vertices, int[] triangles)
+        {
+            float volume = 0f;
+
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                var v0 = vertices[triangles[i]];
+                var v1 = vertices[triangles[i + 1]];
+                var v2 = vertices[triangles[i + 2]];
+
+                var normal = Vector3.Cross(v1 - v0, v2 - v0);
+                float area = normal.magnitude * 0.5f;
+
+                volume += Vector3.Dot((v0 + v1 + v2) / 3f, normal.normalized) * area / 3f;
+            }
+
+            return Mathf.Abs(volume);
+        }
+    }
 }
