@@ -135,8 +135,27 @@ namespace SoftbodyPhysics
             }
 
             UpdateVelocity(deltaTime);
+            UpdateCenter();
             
             _meshFilter.mesh.SetVertices(_positions);
+        }
+        
+        private void UpdateCenter()
+        {
+            var center = Vector3.zero;
+            float totalMass = 0;
+
+            for (int i = 0; i < _positions.Length; i++)
+            {
+                center += (transform.position + _positions[i]) * _masses[i];
+                totalMass += _masses[i];
+            }
+
+            var offset = center / totalMass - transform.position;
+            transform.position += offset;
+
+            for (int i = 0; i < _positions.Length; i++)
+                _positions[i] -= offset;
         }
 
         [ContextMenu("Test")]
@@ -170,13 +189,11 @@ namespace SoftbodyPhysics
             for (int i = 0; i < _positions.Length; i++)
             {
                 var path = _predicted[i] - _positions[i];
-                var ray = new Ray(_positions[i], path.normalized);
+                var ray = new Ray(transform.position + _positions[i], path.normalized);
 
                 if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
                     _contacts.Add(new Contact(i, hitInfo.point, hitInfo.normal));
             }
-            
-            Debug.Log(_contacts.Count);
         }
 
         private void DampVelocity(float deltaTime)
