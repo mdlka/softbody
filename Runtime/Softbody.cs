@@ -25,9 +25,9 @@ namespace SoftbodyPhysics
         [Space, SerializeField] private ConstraintType _currentConstraint;
         [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
-        [SerializeField] private float _pushForce;
-        [SerializeField] private float _damping;
+        [SerializeField, Range(0, 1f)] private float _volumeConstraintStiffness;
         [SerializeField] private float _restCollisionDistance;
+        [SerializeField] private float _damping;
 
         private Vector3[] _positions;
         private Vector3[] _predicted;
@@ -158,14 +158,6 @@ namespace SoftbodyPhysics
                 _positions[i] -= offset;
         }
 
-        [ContextMenu("Test")]
-        private void Test()
-        {
-            Vector3 offset = new Vector3(Random.Range(-1f, 1f), 0, Random.Range(-1f, 1f)).normalized * _pushForce;
-            _positions[Random.Range(0, _positions.Length)] += offset;
-            _meshFilter.mesh.SetVertices(_positions);
-        }
-
         private void ProjectConstraints(int iteration)
         {
             foreach (var contact in _contacts)
@@ -180,6 +172,8 @@ namespace SoftbodyPhysics
                 foreach (var pair in _distance) 
                     ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
             }
+
+            // ApplyVolumeConstraint(_volumeConstraintStiffness);
         }
         
         private void GenerateCollisionConstraints()
@@ -268,6 +262,40 @@ namespace SoftbodyPhysics
             {
                 var goal = cm + (R * _restPositions[i]).ToVector3();
                 _predicted[i] += (goal - _predicted[i]) * stiffness;
+            }
+        }
+        
+        private void ApplyVolumeConstraint(float stiffness)
+        {
+            var triangles = _meshFilter.mesh.triangles;
+            var restVolume = MeshMath.ComputeVolume(_restPositions, triangles);
+            var predictedVolume = MeshMath.ComputeVolume(_predicted, triangles);
+
+            float s = 0f;
+            
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                var v0 = _predicted[triangles[i]];
+                var v1 = _predicted[triangles[i + 1]];
+                var v2 = _predicted[triangles[i + 2]];
+
+                var normal = Vector3.Cross(v1 - v0, v2 - v0);
+                float area = normal.magnitude * 0.5f;
+
+                s += Vector3.Dot(normal.normalized, normal.normalized);
+            }
+
+            float c = predictedVolume - restVolume;
+            
+            for (int i = 0; i < triangles.Length; i += 3)
+            {
+                var v0 = _predicted[triangles[i]];
+                var v1 = _predicted[triangles[i + 1]];
+                var v2 = _predicted[triangles[i + 2]];
+
+                var normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
+
+                _predicted[triangles[i]] -= c / s * normal * stiffness;
             }
         }
 
