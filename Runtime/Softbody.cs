@@ -62,9 +62,6 @@ namespace SoftbodyPhysics
             _masses = new float[_positions.Length];
             _invMasses = new float[_positions.Length];
             
-            foreach (var position in _positions)
-                Debug.Log(position);
-            
             Array.Fill(_masses, 1f);
 
             for (int i = 0; i < _masses.Length; i++)
