@@ -41,7 +41,7 @@ namespace SoftbodyPhysics
             }
         }
 
-        public IReadOnlyCollection<Node> Nodes => _nodes;
+        public IReadOnlyList<Node> Nodes => _nodes;
 
         public void UpdateVertices()
         {
@@ -50,6 +50,24 @@ namespace SoftbodyPhysics
                     _vertices[vertexIndex] = _nodes[pair.Key].Position;
 
             _mesh.vertices = _vertices;
+        }
+        
+        public void UpdateCenter(Transform transform)
+        {
+            var center = Vector3.zero;
+            float totalMass = 0;
+
+            foreach (var node in _nodes)
+            {
+                center += (transform.position + node.Position) * node.Mass;
+                totalMass += node.Mass;
+            }
+
+            var offset = center / totalMass - transform.position;
+            transform.position += offset;
+
+            foreach (var node in _nodes)
+                node.Position -= offset;
         }
     }
 
