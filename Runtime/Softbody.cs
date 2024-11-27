@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using Random = UnityEngine.Random;
 
 namespace SoftbodyPhysics
 {
@@ -23,11 +22,14 @@ namespace SoftbodyPhysics
         [SerializeField] private Vector3 _gravity;
         [SerializeField] private int _solverIterations;
         [Space, SerializeField] private ConstraintType _currentConstraint;
+        [SerializeField] private bool _applyVolumeConstraint;
         [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _volumeConstraintStiffness;
-        [SerializeField] private float _restCollisionDistance;
         [SerializeField] private float _damping;
+        [SerializeField] private float _restCollisionDistance;
+        [SerializeField] private float _restitution;
+        [SerializeField] private float _friction;
 
         private Vector3[] _positions;
         private Vector3[] _predicted;
@@ -60,7 +62,8 @@ namespace SoftbodyPhysics
             _masses = new float[_positions.Length];
             _invMasses = new float[_positions.Length];
             
-            Debug.Log(_positions.Length);
+            foreach (var position in _positions)
+                Debug.Log(position);
             
             Array.Fill(_masses, 1f);
 
@@ -173,7 +176,8 @@ namespace SoftbodyPhysics
                     ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
             }
 
-            // ApplyVolumeConstraint(_volumeConstraintStiffness);
+            if (_applyVolumeConstraint)
+                ApplyVolumeConstraint(_volumeConstraintStiffness);
         }
         
         private void GenerateCollisionConstraints()
@@ -184,6 +188,8 @@ namespace SoftbodyPhysics
             {
                 var path = _predicted[i] - _positions[i];
                 var ray = new Ray(transform.position + _positions[i], path.normalized);
+                
+                Debug.DrawRay(ray.origin, ray.direction * path.magnitude, Color.green, Time.deltaTime);
 
                 if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
                     _contacts.Add(new Contact(i, hitInfo.point, hitInfo.normal));
@@ -200,10 +206,19 @@ namespace SoftbodyPhysics
         {
             foreach (var contact in _contacts)
             {
-                float normalVelocity = Vector3.Dot(_velocities[contact.Index], contact.SurfaceNormal);
-    
-                if (normalVelocity < 0f)
-                    _velocities[contact.Index] -= (1 + _damping) * normalVelocity * contact.SurfaceNormal;
+                float velocityNormal = Vector3.Dot(_velocities[contact.Index], contact.SurfaceNormal);
+
+                Debug.DrawRay(transform.position + _positions[contact.Index], 
+                    transform.position + _positions[contact.Index] + _velocities[contact.Index], Color.magenta, Time.deltaTime);
+                
+                if (velocityNormal > 0f)
+                    _velocities[contact.Index] -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
+                
+                var velocityTangent = _velocities[contact.Index] - contact.SurfaceNormal * velocityNormal;
+                _velocities[contact.Index] -= velocityTangent * _friction;
+                
+                Debug.DrawRay(transform.position + _positions[contact.Index], 
+                    transform.position + _positions[contact.Index] + _velocities[contact.Index], Color.yellow, Time.deltaTime);
             }
         }
 
@@ -301,8 +316,25 @@ namespace SoftbodyPhysics
 
         private void ApplyCollisionConstraint(Contact contact)
         {
-            var delta = Vector3.Dot(_predicted[contact.Index] - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
+            var delta = Vector3.Dot(transform.position + _predicted[contact.Index] - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
+
+            if (delta > 0f) 
+                return;
+            
             _predicted[contact.Index] += contact.SurfaceNormal * -delta;
+        }
+        
+        private void OnDrawGizmos()
+        {
+            Gizmos.color = Color.blue;
+
+            foreach (var position in _positions ?? Array.Empty<Vector3>())
+                Gizmos.DrawSphere(transform.position + position, 0.02f);
+
+            Gizmos.color = Color.red;
+            
+            foreach (var contact in _contacts)
+                Gizmos.DrawSphere(contact.EntryPoint, 0.02f);
         }
     }
 }
