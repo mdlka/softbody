@@ -5,8 +5,8 @@ namespace SoftbodyPhysics
 {
     internal class Body
     {
-        private readonly Dictionary<int, List<int>> _verticesByNodes = new();
-        private readonly List<Node> _nodes = new();
+        private readonly Dictionary<int, List<int>> _verticesByParticle = new();
+        private readonly List<Particle> _particles = new();
         private readonly Vector3[] _vertices;
         private readonly Mesh _mesh;
 
@@ -15,17 +15,17 @@ namespace SoftbodyPhysics
             _mesh = mesh;
             _vertices = mesh.vertices;
 
-            var nodeByPosition = new Dictionary<Vector3, int>();
+            var particleByPosition = new Dictionary<Vector3, int>();
 
             for (int i = 0; i < _vertices.Length; i++)
             {
-                if (nodeByPosition.ContainsKey(_vertices[i]))
+                if (particleByPosition.ContainsKey(_vertices[i]))
                 {
-                    _verticesByNodes[nodeByPosition[_vertices[i]]].Add(i);
+                    _verticesByParticle[particleByPosition[_vertices[i]]].Add(i);
                 }
                 else
                 {
-                    var node = new Node
+                    var particle = new Particle
                     {
                         Position = _vertices[i],
                         Predicted = Vector3.zero,
@@ -34,20 +34,20 @@ namespace SoftbodyPhysics
                         InvMass = 1f
                     };
                     
-                    _nodes.Add(node);
-                    _verticesByNodes[_nodes.Count - 1] = new List<int> { i };
-                    nodeByPosition[_vertices[i]] = _nodes.Count - 1;
+                    _particles.Add(particle);
+                    _verticesByParticle[_particles.Count - 1] = new List<int> { i };
+                    particleByPosition[_vertices[i]] = _particles.Count - 1;
                 }
             }
         }
 
-        public IReadOnlyList<Node> Nodes => _nodes;
+        public IReadOnlyList<Particle> Particles => _particles;
 
         public void UpdateVertices()
         {
-            foreach (var pair in _verticesByNodes)
+            foreach (var pair in _verticesByParticle)
                 foreach (int vertexIndex in pair.Value)
-                    _vertices[vertexIndex] = _nodes[pair.Key].Position;
+                    _vertices[vertexIndex] = _particles[pair.Key].Position;
 
             _mesh.vertices = _vertices;
         }
@@ -57,21 +57,21 @@ namespace SoftbodyPhysics
             var center = Vector3.zero;
             float totalMass = 0;
 
-            foreach (var node in _nodes)
+            foreach (var particle in _particles)
             {
-                center += (transform.position + node.Position) * node.Mass;
-                totalMass += node.Mass;
+                center += (transform.position + particle.Position) * particle.Mass;
+                totalMass += particle.Mass;
             }
 
             var offset = center / totalMass - transform.position;
             transform.position += offset;
 
-            foreach (var node in _nodes)
+            foreach (var node in _particles)
                 node.Position -= offset;
         }
     }
 
-    internal class Node
+    internal class Particle
     {
         public Vector3 Position;
         public Vector3 Predicted;

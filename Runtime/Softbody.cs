@@ -54,44 +54,44 @@ namespace SoftbodyPhysics
 
             _body = new Body(_meshFilter.mesh);
             
-            Debug.Log(_body.Nodes.Count);
+            Debug.Log(_body.Particles.Count);
 
-            for (int i = 0; i < _body.Nodes.Count; i++)
-                for (int j = i+1; j < _body.Nodes.Count; j++)
-                    _distance[(i, j)] = (_body.Nodes[i].Position - _body.Nodes[j].Position).magnitude;
+            for (int i = 0; i < _body.Particles.Count; i++)
+                for (int j = i+1; j < _body.Particles.Count; j++)
+                    _distance[(i, j)] = (_body.Particles[i].Position - _body.Particles[j].Position).magnitude;
             
             // ShapeMatchingConstraint initialization
             _invRestMatrix = Matrix4x4.identity;
-            _restPositions = new Vector3[_body.Nodes.Count];
+            _restPositions = new Vector3[_body.Particles.Count];
 
             float wsum = 0;
             var restCm = Vector3.zero;
             
-            foreach (var node in _body.Nodes)
+            foreach (var particle in _body.Particles)
             {
-                restCm += node.Position * node.Mass;
-                wsum += node.Mass;
+                restCm += particle.Position * particle.Mass;
+                wsum += particle.Mass;
             }
 
             restCm /= wsum;
             var A = Matrix4x4.zero;
 
-            for (int i = 0; i < _body.Nodes.Count; i++)
+            for (int i = 0; i < _body.Particles.Count; i++)
             {
-                var node = _body.Nodes[i];
-                var q = node.Position - restCm;
+                var particle = _body.Particles[i];
+                var q = particle.Position - restCm;
 
-                A[0, 0] += node.Mass * q.x * q.x;
-                A[0, 1] += node.Mass * q.x * q.y;
-                A[0, 2] += node.Mass * q.x * q.z;
+                A[0, 0] += particle.Mass * q.x * q.x;
+                A[0, 1] += particle.Mass * q.x * q.y;
+                A[0, 2] += particle.Mass * q.x * q.z;
 
-                A[1, 0] += node.Mass * q.y * q.x;
-                A[1, 1] += node.Mass * q.y * q.y;
-                A[1, 2] += node.Mass * q.y * q.z;
+                A[1, 0] += particle.Mass * q.y * q.x;
+                A[1, 1] += particle.Mass * q.y * q.y;
+                A[1, 2] += particle.Mass * q.y * q.z;
 
-                A[2, 0] += node.Mass * q.z * q.x;
-                A[2, 1] += node.Mass * q.z * q.y;
-                A[2, 2] += node.Mass * q.z * q.z;
+                A[2, 0] += particle.Mass * q.z * q.x;
+                A[2, 1] += particle.Mass * q.z * q.y;
+                A[2, 2] += particle.Mass * q.z * q.z;
 
                 _restPositions[i] = q;
             }
@@ -104,24 +104,24 @@ namespace SoftbodyPhysics
             float deltaTime = Time.fixedDeltaTime;
             
             // Hook up external forces to the system (e.g. gravity)
-            foreach (var node in _body.Nodes)
-                node.Velocity += deltaTime * node.InvMass * _gravity;
+            foreach (var particle in _body.Particles)
+                particle.Velocity += deltaTime * particle.InvMass * _gravity;
 
             DampVelocity(deltaTime);
 
             // Estimates for new locations of the vertices
-            foreach (var node in _body.Nodes)
-                node.Predicted = node.Position + deltaTime * node.Velocity;
+            foreach (var particle in _body.Particles)
+                particle.Predicted = particle.Position + deltaTime * particle.Velocity;
 
             GenerateCollisionConstraints();
             
             for (int i = 0; i < _solverIterations; i++)
                 ProjectConstraints(i + 1);
             
-            foreach (var node in _body.Nodes)
+            foreach (var particle in _body.Particles)
             {
-                node.Velocity = (node.Predicted - node.Position) / deltaTime;
-                node.Position = node.Predicted;
+                particle.Velocity = (particle.Predicted - particle.Position) / deltaTime;
+                particle.Position = particle.Predicted;
             }
 
             UpdateVelocity(deltaTime);
@@ -153,10 +153,10 @@ namespace SoftbodyPhysics
         {
             _contacts.Clear();
 
-            for (int i = 0; i < _body.Nodes.Count; i++)
+            for (int i = 0; i < _body.Particles.Count; i++)
             {
-                var path = _body.Nodes[i].Predicted - _body.Nodes[i].Position;
-                var ray = new Ray(transform.position + _body.Nodes[i].Position, path.normalized);
+                var path = _body.Particles[i].Predicted - _body.Particles[i].Position;
+                var ray = new Ray(transform.position + _body.Particles[i].Position, path.normalized);
                 
                 Debug.DrawRay(ray.origin, ray.direction * path.magnitude, Color.green, Time.deltaTime);
 
@@ -167,42 +167,42 @@ namespace SoftbodyPhysics
 
         private void DampVelocity(float deltaTime)
         {
-            foreach (var node in _body.Nodes)
-                node.Velocity -= node.Velocity * _damping * deltaTime;
+            foreach (var particle in _body.Particles)
+                particle.Velocity -= particle.Velocity * _damping * deltaTime;
         }
         
         private void UpdateVelocity(float deltaTime)
         {
             foreach (var contact in _contacts)
             {
-                float velocityNormal = Vector3.Dot(_body.Nodes[contact.Index].Velocity, contact.SurfaceNormal);
+                float velocityNormal = Vector3.Dot(_body.Particles[contact.Index].Velocity, contact.SurfaceNormal);
 
-                Debug.DrawRay(transform.position + _body.Nodes[contact.Index].Position, 
-                    transform.position + _body.Nodes[contact.Index].Position + _body.Nodes[contact.Index].Velocity, Color.magenta, Time.deltaTime);
+                Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
+                    transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.magenta, Time.deltaTime);
                 
                 if (velocityNormal > 0f)
-                    _body.Nodes[contact.Index].Velocity -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
+                    _body.Particles[contact.Index].Velocity -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
                 
-                var velocityTangent = _body.Nodes[contact.Index].Velocity - contact.SurfaceNormal * velocityNormal;
-                _body.Nodes[contact.Index].Velocity -= velocityTangent * _friction;
+                var velocityTangent = _body.Particles[contact.Index].Velocity - contact.SurfaceNormal * velocityNormal;
+                _body.Particles[contact.Index].Velocity -= velocityTangent * _friction;
                 
-                Debug.DrawRay(transform.position + _body.Nodes[contact.Index].Position, 
-                    transform.position + _body.Nodes[contact.Index].Position + _body.Nodes[contact.Index].Velocity, Color.yellow, Time.deltaTime);
+                Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
+                    transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.yellow, Time.deltaTime);
             }
         }
 
         private void ApplyDistanceConstraint(int i1, int i2, float restLength, float stiffness)
         {
-            float wSum = _body.Nodes[i1].InvMass + _body.Nodes[i2].InvMass;
+            float wSum = _body.Particles[i1].InvMass + _body.Particles[i2].InvMass;
 
             if (wSum == 0)
                 return;
             
-            var diff = _body.Nodes[i1].Predicted - _body.Nodes[i2].Predicted;
+            var diff = _body.Particles[i1].Predicted - _body.Particles[i2].Predicted;
             var correction = stiffness * diff.normalized * (diff.magnitude - restLength) / wSum;
 
-            _body.Nodes[i1].Predicted -= _body.Nodes[i1].InvMass * correction;
-            _body.Nodes[i2].Predicted += _body.Nodes[i2].InvMass * correction;
+            _body.Particles[i1].Predicted -= _body.Particles[i1].InvMass * correction;
+            _body.Particles[i2].Predicted += _body.Particles[i2].InvMass * correction;
         }
 
         private void ApplyShapeMatchingConstraint(float stiffness)
@@ -210,42 +210,42 @@ namespace SoftbodyPhysics
             var cm = Vector3.zero;
             float wsum = 0f;
 
-            foreach (var node in _body.Nodes)
+            foreach (var particle in _body.Particles)
             {
-                cm += node.Predicted * node.Mass;
-                wsum += node.Mass;
+                cm += particle.Predicted * particle.Mass;
+                wsum += particle.Mass;
             }
 
             cm /= wsum;
 
             var A = Matrix4x4.zero;
 
-            for (int i = 0; i < _body.Nodes.Count; i++)
+            for (int i = 0; i < _body.Particles.Count; i++)
             {
                 Vector3 q = _restPositions[i];
-                Vector3 p = _body.Nodes[i].Position - cm;
+                Vector3 p = _body.Particles[i].Position - cm;
 
-                A[0, 0] += _body.Nodes[i].Mass * p.x * q.x;
-                A[0, 1] += _body.Nodes[i].Mass * p.x * q.y;
-                A[0, 2] += _body.Nodes[i].Mass * p.x * q.z;
+                A[0, 0] += _body.Particles[i].Mass * p.x * q.x;
+                A[0, 1] += _body.Particles[i].Mass * p.x * q.y;
+                A[0, 2] += _body.Particles[i].Mass * p.x * q.z;
 
-                A[1, 0] += _body.Nodes[i].Mass * p.y * q.x;
-                A[1, 1] += _body.Nodes[i].Mass * p.y * q.y;
-                A[1, 2] += _body.Nodes[i].Mass * p.y * q.z;
+                A[1, 0] += _body.Particles[i].Mass * p.y * q.x;
+                A[1, 1] += _body.Particles[i].Mass * p.y * q.y;
+                A[1, 2] += _body.Particles[i].Mass * p.y * q.z;
 
-                A[2, 0] += _body.Nodes[i].Mass * p.z * q.x;
-                A[2, 1] += _body.Nodes[i].Mass * p.z * q.y;
-                A[2, 2] += _body.Nodes[i].Mass * p.z * q.z;
+                A[2, 0] += _body.Particles[i].Mass * p.z * q.x;
+                A[2, 1] += _body.Particles[i].Mass * p.z * q.y;
+                A[2, 2] += _body.Particles[i].Mass * p.z * q.z;
             }
 
             A *= _invRestMatrix;
             
             MatrixMath.PolarDecompositionStable(A, 1e-6f, out Matrix4x4 R);
 
-            for (int i = 0; i < _body.Nodes.Count; i++)
+            for (int i = 0; i < _body.Particles.Count; i++)
             {
                 var goal = cm + (R * _restPositions[i]).ToVector3();
-                _body.Nodes[i].Predicted += (goal - _body.Nodes[i].Predicted) * stiffness;
+                _body.Particles[i].Predicted += (goal - _body.Particles[i].Predicted) * stiffness;
             }
         }
         
@@ -285,20 +285,20 @@ namespace SoftbodyPhysics
 
         private void ApplyCollisionConstraint(Contact contact)
         {
-            var delta = Vector3.Dot(transform.position + _body.Nodes[contact.Index].Predicted - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
+            var delta = Vector3.Dot(transform.position + _body.Particles[contact.Index].Predicted - contact.EntryPoint, contact.SurfaceNormal) - _restCollisionDistance;
 
             if (delta > 0f) 
                 return;
 
-            _body.Nodes[contact.Index].Predicted -= contact.SurfaceNormal * delta;
+            _body.Particles[contact.Index].Predicted -= contact.SurfaceNormal * delta;
         }
         
         private void OnDrawGizmos()
         {
             Gizmos.color = Color.blue;
 
-            foreach (var node in _body?.Nodes ?? Array.Empty<Node>())
-                Gizmos.DrawSphere(transform.position + node.Position, 0.02f);
+            foreach (var particle in _body?.Particles ?? Array.Empty<Particle>())
+                Gizmos.DrawSphere(transform.position + particle.Position, 0.02f);
 
             Gizmos.color = Color.red;
             
