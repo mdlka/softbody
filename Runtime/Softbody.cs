@@ -32,6 +32,7 @@ namespace SoftbodyPhysics
         [SerializeField] private float _restitution;
         [SerializeField] private float _friction;
         [SerializeField] private float _particleRadius;
+        [SerializeField] private bool _needDrawParticleRadius;
 
         private Body _body;
         
@@ -170,8 +171,9 @@ namespace SoftbodyPhysics
                 }
                 else if (Physics.OverlapSphereNonAlloc(predictedPosition, _particleRadius, colliders) > 0)
                 {
-                    var hitNormal = (predictedPosition - colliders[0].ClosestPointOnBounds(predictedPosition)).normalized;
-                    _contacts.Add(new Contact(i, predictedPosition, hitNormal));
+                    var hitPosition = colliders[0].ClosestPoint(predictedPosition);
+                    var hitNormal = (predictedPosition - hitPosition).normalized;
+                    _contacts.Add(new Contact(i, hitPosition, hitNormal));
                 }
             }
         }
@@ -296,8 +298,8 @@ namespace SoftbodyPhysics
 
         private void ApplyCollisionConstraint(Contact contact)
         {
-            var delta = Vector3.Dot(transform.position + _body.Particles[contact.Index].Predicted,
-                contact.SurfaceNormal) - _restCollisionDistance;
+            var delta = Vector3.Dot(transform.position + _body.Particles[contact.Index].Predicted - contact.EntryPoint,
+                contact.SurfaceNormal) - _restCollisionDistance - _particleRadius;
 
             if (delta > 0f) 
                 return;
@@ -309,13 +311,17 @@ namespace SoftbodyPhysics
         {
             Gizmos.color = Color.blue;
 
-            foreach (var particle in _body?.Particles ?? Array.Empty<Particle>())
-                Gizmos.DrawSphere(transform.position + particle.Position, 0.02f);
+            if (_needDrawParticleRadius)
+                foreach (var particle in _body?.Particles ?? Array.Empty<Particle>())
+                    Gizmos.DrawWireSphere(transform.position + particle.Position, _particleRadius);
 
             Gizmos.color = Color.red;
-            
+
             foreach (var contact in _contacts)
+            {
                 Gizmos.DrawSphere(contact.EntryPoint, 0.02f);
+                Gizmos.DrawLine(contact.EntryPoint, contact.EntryPoint + contact.SurfaceNormal * 0.2f);
+            }
         }
     }
 }
