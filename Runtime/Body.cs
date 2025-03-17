@@ -66,8 +66,19 @@ namespace SoftbodyPhysics
             var offset = center / totalMass - transform.position;
             transform.position += offset;
 
-            foreach (var node in _particles)
-                node.Position -= offset;
+            foreach (var particle in _particles)
+                particle.Position -= offset;
+        }
+
+        public void UpdateRotation(Transform transform)
+        {
+            foreach (var particle in _particles)
+                particle.Position = transform.rotation * particle.Position;
+            
+            UpdateVertices();
+            _mesh.RecalculateNormals();
+            
+            transform.rotation = Quaternion.identity;
         }
     }
 

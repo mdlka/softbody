@@ -56,6 +56,7 @@ namespace SoftbodyPhysics
             }
 
             _body = new Body(_meshFilter.mesh);
+            _body.UpdateRotation(transform);
             
             Debug.Log(_body.Particles.Count);
 
@@ -128,7 +129,6 @@ namespace SoftbodyPhysics
             }
 
             UpdateVelocity(deltaTime);
-            
             _body.UpdateCenter(transform);
             _body.UpdateVertices();
         }
