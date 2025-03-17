@@ -6,13 +6,6 @@ namespace SoftbodyPhysics
 {
     public class Softbody : MonoBehaviour
     {
-        private enum ConstraintType
-        {
-            Distance,
-            ShapeMatching
-        }
-        
-        private readonly Dictionary<(int, int), float> _distance = new();
         private readonly List<Contact> _contacts = new();
 
         [SerializeField] private bool _needCreateObject;
@@ -21,11 +14,7 @@ namespace SoftbodyPhysics
         [SerializeField] private MeshFilter _meshFilter;
         [SerializeField] private Vector3 _gravity;
         [SerializeField] private int _solverIterations;
-        [Space, SerializeField] private ConstraintType _currentConstraint;
-        [SerializeField] private bool _applyVolumeConstraint;
-        [SerializeField, Range(0, 1f)] private float _distanceConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
-        [SerializeField, Range(0, 1f)] private float _volumeConstraintStiffness;
         [SerializeField, Range(0, 1f)] private float _collisionConstraintStiffness;
         [SerializeField] private float _damping;
         [SerializeField] private float _restCollisionDistance;
@@ -39,12 +28,7 @@ namespace SoftbodyPhysics
         private Matrix4x4 _invRestMatrix;
         private Vector3[] _restPositions;
 
-        private record Contact(int Index, Vector3 EntryPoint, Vector3 SurfaceNormal)
-        {
-            public int Index { get; } = Index;
-            public Vector3 EntryPoint { get; } = EntryPoint;
-            public Vector3 SurfaceNormal { get; } = SurfaceNormal;
-        }
+        private record Contact(int Index, Vector3 EntryPoint, Vector3 SurfaceNormal);
 
         private void Awake()
         {
@@ -60,10 +44,6 @@ namespace SoftbodyPhysics
             
             Debug.Log(_body.Particles.Count);
 
-            for (int i = 0; i < _body.Particles.Count; i++)
-                for (int j = i+1; j < _body.Particles.Count; j++)
-                    _distance[(i, j)] = (_body.Particles[i].Position - _body.Particles[j].Position).magnitude;
-            
             // ShapeMatchingConstraint initialization
             _invRestMatrix = Matrix4x4.identity;
             _restPositions = new Vector3[_body.Particles.Count];
@@ -129,6 +109,7 @@ namespace SoftbodyPhysics
             }
 
             UpdateVelocity(deltaTime);
+            
             _body.UpdateCenter(transform);
             _body.UpdateVertices();
         }
@@ -138,18 +119,7 @@ namespace SoftbodyPhysics
             foreach (var contact in _contacts)
                 ApplyCollisionConstraint(contact);
 
-            if (_currentConstraint == ConstraintType.ShapeMatching)
-            {
-                ApplyShapeMatchingConstraint(_shapeMatchingConstraintStiffness);
-            }
-            else if (_currentConstraint == ConstraintType.Distance)
-            {
-                foreach (var pair in _distance) 
-                    ApplyDistanceConstraint(pair.Key.Item1, pair.Key.Item2, pair.Value, _distanceConstraintStiffness);
-            }
-
-            if (_applyVolumeConstraint)
-                ApplyVolumeConstraint(_volumeConstraintStiffness);
+            ApplyShapeMatchingConstraint(_shapeMatchingConstraintStiffness);
         }
         
         private void GenerateCollisionConstraints()
@@ -186,36 +156,22 @@ namespace SoftbodyPhysics
         
         private void UpdateVelocity(float deltaTime)
         {
-            // foreach (var contact in _contacts)
-            // {
-            //     float velocityNormal = Vector3.Dot(_body.Particles[contact.Index].Velocity, contact.SurfaceNormal);
-            //
-            //     Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
-            //         transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.magenta, Time.deltaTime);
-            //     
-            //     if (velocityNormal > 0f)
-            //         _body.Particles[contact.Index].Velocity -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
-            //     
-            //     var velocityTangent = _body.Particles[contact.Index].Velocity - contact.SurfaceNormal * velocityNormal;
-            //     _body.Particles[contact.Index].Velocity -= velocityTangent * _friction;
-            //     
-            //     Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
-            //         transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.yellow, Time.deltaTime);
-            // }
-        }
-
-        private void ApplyDistanceConstraint(int i1, int i2, float restLength, float stiffness)
-        {
-            float wSum = _body.Particles[i1].InvMass + _body.Particles[i2].InvMass;
-
-            if (wSum == 0)
-                return;
+            foreach (var contact in _contacts)
+            {
+                float velocityNormal = Vector3.Dot(_body.Particles[contact.Index].Velocity, contact.SurfaceNormal);
             
-            var diff = _body.Particles[i1].Predicted - _body.Particles[i2].Predicted;
-            var correction = stiffness * diff.normalized * (diff.magnitude - restLength) / wSum;
-
-            _body.Particles[i1].Predicted -= _body.Particles[i1].InvMass * correction;
-            _body.Particles[i2].Predicted += _body.Particles[i2].InvMass * correction;
+                Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
+                    transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.magenta, Time.deltaTime);
+                
+                if (velocityNormal > 0f)
+                    _body.Particles[contact.Index].Velocity -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
+                
+                var velocityTangent = _body.Particles[contact.Index].Velocity - contact.SurfaceNormal * velocityNormal;
+                _body.Particles[contact.Index].Velocity -= velocityTangent * _friction;
+                
+                Debug.DrawRay(transform.position + _body.Particles[contact.Index].Position, 
+                    transform.position + _body.Particles[contact.Index].Position + _body.Particles[contact.Index].Velocity, Color.yellow, Time.deltaTime);
+            }
         }
 
         private void ApplyShapeMatchingConstraint(float stiffness)
@@ -260,40 +216,6 @@ namespace SoftbodyPhysics
                 var goal = cm + (R * _restPositions[i]).ToVector3();
                 _body.Particles[i].Predicted += (goal - _body.Particles[i].Predicted) * stiffness;
             }
-        }
-        
-        private void ApplyVolumeConstraint(float stiffness)
-        {
-            // var triangles = _meshFilter.mesh.triangles;
-            // var restVolume = MeshMath.ComputeVolume(_restPositions, triangles);
-            // var predictedVolume = MeshMath.ComputeVolume(_predicted, triangles);
-            //
-            // float s = 0f;
-            //
-            // for (int i = 0; i < triangles.Length; i += 3)
-            // {
-            //     var v0 = _predicted[triangles[i]];
-            //     var v1 = _predicted[triangles[i + 1]];
-            //     var v2 = _predicted[triangles[i + 2]];
-            //
-            //     var normal = Vector3.Cross(v1 - v0, v2 - v0);
-            //     float area = normal.magnitude * 0.5f;
-            //
-            //     s += Vector3.Dot(normal.normalized, normal.normalized);
-            // }
-            //
-            // float c = predictedVolume - restVolume;
-            //
-            // for (int i = 0; i < triangles.Length; i += 3)
-            // {
-            //     var v0 = _predicted[triangles[i]];
-            //     var v1 = _predicted[triangles[i + 1]];
-            //     var v2 = _predicted[triangles[i + 2]];
-            //
-            //     var normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
-            //
-            //     _predicted[triangles[i]] -= c / s * normal * stiffness;
-            // }
         }
 
         private void ApplyCollisionConstraint(Contact contact)
