@@ -5,7 +5,6 @@ using UnityEngine;
 
 namespace SoftbodyPhysics
 {
-    [CreateAssetMenu(menuName = "SoftPhysics/Create DefaultSolver", fileName = "DefaultSolver", order = 56)]
     public class DefaultSolver : BaseSolver
     {
         private readonly HashSet<ISoftbody> _bodies = new();

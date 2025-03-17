@@ -2,7 +2,7 @@
 
 namespace SoftbodyPhysics
 {
-    public abstract class BaseSolver : ScriptableObject
+    public abstract class BaseSolver : MonoBehaviour
     {
         public abstract void AddBody(ISoftbody body);
         
