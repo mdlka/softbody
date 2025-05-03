@@ -18,6 +18,41 @@ namespace SoftbodyPhysics
             }
         }
 
+        public static void PrepareBalloonsConstraint(ISoftbody body)
+        {
+            body.UpdateRestVolume(MeshMath.ComputeVolume(body.Mesh.vertices, body.Mesh.triangles));
+        }
+
+        public static void ApplyBalloonsConstraint(ISoftbody body, float balloonsConstraintsStiffness, float pressureStiffness)
+        {
+            float s = 0f;
+            
+            for (int i = 0; i < body.ParticlesTriangles.Count; i += 3)
+            {
+                var v0 = body.Particles[body.ParticlesTriangles[i]].Predicted;
+                var v1 = body.Particles[body.ParticlesTriangles[i + 1]].Predicted;
+                var v2 = body.Particles[body.ParticlesTriangles[i + 2]].Predicted;
+            
+                var normal = Vector3.Cross(v1 - v0, v2 - v0);
+            
+                s += Vector3.Dot(normal.normalized, normal.normalized);
+            }
+            
+            float predictedVolume = MeshMath.ComputePredictedVolume(body.Particles, body.ParticlesTriangles);
+            float delta = predictedVolume - pressureStiffness * body.RestVolume;
+            
+            for (int i = 0; i < body.ParticlesTriangles.Count; i += 3)
+            {
+                var v0 = body.Particles[body.ParticlesTriangles[i]].Predicted;
+                var v1 = body.Particles[body.ParticlesTriangles[i + 1]].Predicted;
+                var v2 = body.Particles[body.ParticlesTriangles[i + 2]].Predicted;
+            
+                var normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
+            
+                body.Particles[body.ParticlesTriangles[i]].Predicted -= delta / s * normal * balloonsConstraintsStiffness;
+            }
+        }
+
         public static void PrepareShapeMatchingConstraint(ISoftbody body)
         {
             float wsum = 0;

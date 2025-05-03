@@ -84,8 +84,8 @@ namespace SoftbodyPhysics
             
             R = at.transpose;
         }
-        
-        public static float OneNorm(Matrix4x4 A)
+
+        private static float OneNorm(Matrix4x4 A)
         {
             float sum1 = Math.Abs(A.m00) + Math.Abs(A.m10) + Math.Abs(A.m20);
             float sum2 = Math.Abs(A.m01) + Math.Abs(A.m11) + Math.Abs(A.m21);
@@ -93,8 +93,8 @@ namespace SoftbodyPhysics
 
             return Math.Max(sum1, Math.Max(sum2, sum3));
         }
-        
-        public static float InfNorm(Matrix4x4 A)
+
+        private static float InfNorm(Matrix4x4 A)
         {
             float sum1 = Math.Abs(A.m00) + Math.Abs(A.m01) + Math.Abs(A.m02);
             float sum2 = Math.Abs(A.m10) + Math.Abs(A.m11) + Math.Abs(A.m12);
@@ -131,6 +131,25 @@ namespace SoftbodyPhysics
                 var v0 = vertices[triangles[i]];
                 var v1 = vertices[triangles[i + 1]];
                 var v2 = vertices[triangles[i + 2]];
+
+                var normal = Vector3.Cross(v1 - v0, v2 - v0);
+                float area = normal.magnitude * 0.5f;
+
+                volume += Vector3.Dot((v0 + v1 + v2) / 3f, normal.normalized) * area / 3f;
+            }
+
+            return Mathf.Abs(volume);
+        }
+        
+        public static float ComputePredictedVolume(IReadOnlyList<Particle> particles, IReadOnlyList<int> triangles)
+        {
+            float volume = 0f;
+
+            for (int i = 0; i < triangles.Count; i += 3)
+            {
+                var v0 = particles[triangles[i]].Predicted;
+                var v1 = particles[triangles[i + 1]].Predicted;
+                var v2 = particles[triangles[i + 2]].Predicted;
 
                 var normal = Vector3.Cross(v1 - v0, v2 - v0);
                 float area = normal.magnitude * 0.5f;

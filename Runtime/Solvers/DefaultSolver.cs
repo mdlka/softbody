@@ -22,7 +22,11 @@ namespace SoftbodyPhysics
         [SerializeField, Range(0, 1f)] private float _collisionConstraintStiffness;
         
         [Header("Shape Matching Constraint")]
-        [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness; 
+        [SerializeField, Range(0, 1f)] private float _shapeMatchingConstraintStiffness;
+
+        [Header("Balloons Constraint")] 
+        [SerializeField, Range(0, 1f)] private float _balloonsConstraintsStiffness;
+        [SerializeField, Range(0, 1f)] private float _pressureStiffness;
         
         public override void AddBody(ISoftbody body)
         {
@@ -31,6 +35,7 @@ namespace SoftbodyPhysics
 
             body.Initialize();
             Constraints.PrepareShapeMatchingConstraint(body);
+            Constraints.PrepareBalloonsConstraint(body);
         }
 
         public override void ApplyExternalForces(float deltaTime)
@@ -64,8 +69,6 @@ namespace SoftbodyPhysics
                     var ray = new Ray(body.CenterPosition + body.Particles[i].Position, path.normalized);
                     var predictedPosition = body.CenterPosition + body.Particles[i].Predicted;
                 
-                    Debug.DrawRay(ray.origin, ray.direction * path.magnitude, Color.green, Time.deltaTime);
-
                     if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
                     {
                         body.AddContact(new Contact(i, hitInfo.point, hitInfo.normal));
@@ -86,6 +89,7 @@ namespace SoftbodyPhysics
             {
                 Constraints.ApplyCollisionConstraint(body, _restCollisionDistance, _collisionConstraintStiffness);
                 Constraints.ApplyShapeMatchingConstraint(body, _shapeMatchingConstraintStiffness);
+                Constraints.ApplyBalloonsConstraint(body, _balloonsConstraintsStiffness, _pressureStiffness);
             }
         }
 
@@ -106,19 +110,11 @@ namespace SoftbodyPhysics
                 {
                     float velocityNormal = Vector3.Dot(body.Particles[contact.Index].Velocity, contact.SurfaceNormal);
             
-                    Debug.DrawRay(body.CenterPosition + body.Particles[contact.Index].Position, 
-                        body.CenterPosition + body.Particles[contact.Index].Position + body.Particles[contact.Index].Velocity, 
-                        Color.magenta, Time.deltaTime);
-                
                     if (velocityNormal > 0f)
                         body.Particles[contact.Index].Velocity -= (1 + _restitution) * velocityNormal * contact.SurfaceNormal;
                 
                     var velocityTangent = body.Particles[contact.Index].Velocity - contact.SurfaceNormal * velocityNormal;
                     body.Particles[contact.Index].Velocity -= velocityTangent * _friction;
-                
-                    Debug.DrawRay(body.CenterPosition + body.Particles[contact.Index].Position, 
-                        body.CenterPosition + body.Particles[contact.Index].Position + body.Particles[contact.Index].Velocity, 
-                        Color.yellow, Time.deltaTime);
                 }
             }
         }
