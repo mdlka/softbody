@@ -222,6 +222,8 @@ MonoBehaviour:
   _particlesRadius: 0.06
   _meshFilter: {fileID: 121773151}
   _needDrawParticleRadius: 0
+  _needDrawParticleContact: 0
+  _needDrawTriangles: 0
 --- !u!1 &705507993
 GameObject:
   m_ObjectHideFlags: 0
@@ -452,6 +454,8 @@ MonoBehaviour:
   _restCollisionDistance: 0
   _collisionConstraintStiffness: 1
   _shapeMatchingConstraintStiffness: 0.1
+  _balloonsConstraintsStiffness: 1
+  _pressureStiffness: 1
 --- !u!1 &948081284
 GameObject:
   m_ObjectHideFlags: 0
@@ -749,6 +753,8 @@ MonoBehaviour:
   _particlesRadius: 0.06
   _meshFilter: {fileID: 1159535718}
   _needDrawParticleRadius: 0
+  _needDrawParticleContact: 0
+  _needDrawTriangles: 0
 --- !u!1 &1337082742
 GameObject:
   m_ObjectHideFlags: 0
