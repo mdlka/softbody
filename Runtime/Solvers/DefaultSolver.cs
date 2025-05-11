@@ -68,8 +68,8 @@ namespace SoftbodyPhysics
                     var path = body.Particles[i].Predicted - body.Particles[i].Position;
                     var ray = new Ray(body.CenterPosition + body.Particles[i].Position, path.normalized);
                     var predictedPosition = body.CenterPosition + body.Particles[i].Predicted;
-                
-                    if (Physics.Raycast(ray, out var hitInfo, path.magnitude))
+                    
+                    if (Physics.SphereCast(ray, body.ParticlesRadius, out var hitInfo, path.magnitude))
                     {
                         body.AddContact(new Contact(i, hitInfo.point, hitInfo.normal));
                     }
@@ -90,6 +90,30 @@ namespace SoftbodyPhysics
                 Constraints.ApplyCollisionConstraint(body, _restCollisionDistance, _collisionConstraintStiffness);
                 Constraints.ApplyShapeMatchingConstraint(body, _shapeMatchingConstraintStiffness);
                 Constraints.ApplyBalloonsConstraint(body, _balloonsConstraintsStiffness, _pressureStiffness);
+            }
+        }
+
+        public override void ResolvePenetrations()
+        {
+            foreach (var body in _bodies)
+            {
+                var colliders = new Collider[1];
+            
+                foreach (var particle in body.Particles)
+                {
+                    if (Physics.OverlapSphereNonAlloc(body.CenterPosition + particle.Predicted, body.ParticlesRadius, colliders) == 0)
+                        continue;
+
+                    var closestPointOnBounds = colliders[0].ClosestPointOnBounds(body.CenterPosition + new Vector3(particle.Predicted.x, 0f, particle.Predicted.z));
+                    var closestPointInCollider = colliders[0].ClosestPoint(body.CenterPosition + particle.Predicted);
+                
+                    var rawDirection = closestPointOnBounds - closestPointInCollider;
+
+                    if (rawDirection.magnitude <= 0f) 
+                        continue;
+                
+                    particle.Predicted += rawDirection.normalized * (rawDirection.magnitude + _restCollisionDistance);
+                }
             }
         }
 
