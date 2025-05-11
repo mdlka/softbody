@@ -132,13 +132,10 @@ namespace SoftbodyPhysics
                 var v1 = vertices[triangles[i + 1]];
                 var v2 = vertices[triangles[i + 2]];
 
-                var normal = Vector3.Cross(v1 - v0, v2 - v0);
-                float area = normal.magnitude * 0.5f;
-
-                volume += Vector3.Dot((v0 + v1 + v2) / 3f, normal.normalized) * area / 3f;
+                volume += Vector3.Dot(v0, Vector3.Cross(v1 - v0, v2 - v0));
             }
 
-            return Mathf.Abs(volume);
+            return Mathf.Abs(volume / 6f);
         }
         
         public static float ComputePredictedVolume(IReadOnlyList<Particle> particles, IReadOnlyList<int> triangles)
@@ -151,13 +148,10 @@ namespace SoftbodyPhysics
                 var v1 = particles[triangles[i + 1]].Predicted;
                 var v2 = particles[triangles[i + 2]].Predicted;
 
-                var normal = Vector3.Cross(v1 - v0, v2 - v0);
-                float area = normal.magnitude * 0.5f;
-
-                volume += Vector3.Dot((v0 + v1 + v2) / 3f, normal.normalized) * area / 3f;
+                volume += Vector3.Dot(v0, Vector3.Cross(v1 - v0, v2 - v0));
             }
 
-            return Mathf.Abs(volume);
+            return Mathf.Abs(volume / 6f);
         }
     }
 }

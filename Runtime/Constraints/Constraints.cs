@@ -25,32 +25,48 @@ namespace SoftbodyPhysics
 
         public static void ApplyBalloonsConstraint(ISoftbody body, float balloonsConstraintsStiffness, float pressureStiffness)
         {
-            float s = 0f;
-            
-            for (int i = 0; i < body.ParticlesTriangles.Count; i += 3)
-            {
-                var v0 = body.Particles[body.ParticlesTriangles[i]].Predicted;
-                var v1 = body.Particles[body.ParticlesTriangles[i + 1]].Predicted;
-                var v2 = body.Particles[body.ParticlesTriangles[i + 2]].Predicted;
-            
-                var normal = Vector3.Cross(v1 - v0, v2 - v0);
-            
-                s += Vector3.Dot(normal.normalized, normal.normalized);
-            }
-            
             float predictedVolume = MeshMath.ComputePredictedVolume(body.Particles, body.ParticlesTriangles);
-            float delta = predictedVolume - pressureStiffness * body.RestVolume;
-            
+
+            float targetVolume = pressureStiffness * body.RestVolume;
+            float constraint = predictedVolume - targetVolume;
+
+            if (Mathf.Abs(constraint) < 1e-6f || body.Particles.Count == 0 || body.ParticlesTriangles.Count == 0)
+                return;
+
+            var totalGradients = new Vector3[body.Particles.Count];
+
             for (int i = 0; i < body.ParticlesTriangles.Count; i += 3)
             {
-                var v0 = body.Particles[body.ParticlesTriangles[i]].Predicted;
-                var v1 = body.Particles[body.ParticlesTriangles[i + 1]].Predicted;
-                var v2 = body.Particles[body.ParticlesTriangles[i + 2]].Predicted;
-            
-                var normal = Vector3.Cross(v1 - v0, v2 - v0).normalized;
-            
-                body.Particles[body.ParticlesTriangles[i]].Predicted -= delta / s * normal * balloonsConstraintsStiffness;
+                int i0 = body.ParticlesTriangles[i];
+                int i1 = body.ParticlesTriangles[i + 1];
+                int i2 = body.ParticlesTriangles[i + 2];
+
+                var v0 = body.Particles[i0].Predicted;
+                var v1 = body.Particles[i1].Predicted;
+                var v2 = body.Particles[i2].Predicted;
+
+                var grad0 = Vector3.Cross(v1, v2) / 6.0f;
+                var grad1 = Vector3.Cross(v2, v0) / 6.0f;
+                var grad2 = Vector3.Cross(v0, v1) / 6.0f;
+
+                totalGradients[i0] += grad0;
+                totalGradients[i1] += grad1;
+                totalGradients[i2] += grad2;
             }
+
+            float sumSqGradInvMass = 0;
+            
+            for (int i = 0; i < body.Particles.Count; i++)
+                sumSqGradInvMass += totalGradients[i].sqrMagnitude * body.Particles[i].InvMass;
+
+            if (sumSqGradInvMass < 1e-6f)
+                return;
+
+            float lambda = -constraint / sumSqGradInvMass;
+            float scale = lambda * balloonsConstraintsStiffness;
+
+            for (int i = 0; i < body.Particles.Count; i++)
+                body.Particles[i].Predicted += scale * totalGradients[i] * body.Particles[i].InvMass;
         }
 
         public static void PrepareShapeMatchingConstraint(ISoftbody body)
