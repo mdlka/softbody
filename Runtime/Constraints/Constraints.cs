@@ -4,6 +4,8 @@ namespace SoftbodyPhysics
 {
     public static class Constraints
     {
+        private const float Epsilon = 1e-6f;
+        
         public static void ApplyCollisionConstraint(ISoftbody body, float restCollisionDistance, float collisionConstraintStiffness)
         {
             foreach (var contact in body.Contacts)
@@ -11,10 +13,11 @@ namespace SoftbodyPhysics
                 float delta = Vector3.Dot(body.CenterPosition + body.Particles[contact.Index].Predicted - contact.EntryPoint,
                     contact.SurfaceNormal) - restCollisionDistance - body.ParticlesRadius;
 
-                if (delta > 0f) 
-                    return;
+                if (delta >= 0f) 
+                    continue;
 
-                body.Particles[contact.Index].Predicted -= contact.SurfaceNormal * delta * collisionConstraintStiffness;
+                body.Particles[contact.Index].Predicted -= contact.SurfaceNormal * delta * collisionConstraintStiffness 
+                                                           * body.Particles[contact.Index].InvMass;
             }
         }
 
@@ -30,7 +33,7 @@ namespace SoftbodyPhysics
             float targetVolume = pressureStiffness * body.RestVolume;
             float constraint = predictedVolume - targetVolume;
 
-            if (Mathf.Abs(constraint) < 1e-6f || body.Particles.Count == 0 || body.ParticlesTriangles.Count == 0)
+            if (Mathf.Abs(constraint) < Epsilon || body.Particles.Count == 0 || body.ParticlesTriangles.Count == 0)
                 return;
 
             var totalGradients = new Vector3[body.Particles.Count];
@@ -59,7 +62,7 @@ namespace SoftbodyPhysics
             for (int i = 0; i < body.Particles.Count; i++)
                 sumSqGradInvMass += totalGradients[i].sqrMagnitude * body.Particles[i].InvMass;
 
-            if (sumSqGradInvMass < 1e-6f)
+            if (sumSqGradInvMass < Epsilon)
                 return;
 
             float lambda = -constraint / sumSqGradInvMass;
@@ -140,7 +143,7 @@ namespace SoftbodyPhysics
 
             A *= body.InvRestMatrix;
             
-            MatrixMath.PolarDecompositionStable(A, 1e-6f, out Matrix4x4 R);
+            MatrixMath.PolarDecompositionStable(A, Epsilon, out Matrix4x4 R);
 
             for (int i = 0; i < body.Particles.Count; i++)
             {
