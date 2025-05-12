@@ -75,13 +75,29 @@ namespace SoftbodyPhysics
                     }
                     else if (Physics.OverlapSphereNonAlloc(predictedPosition, body.ParticlesRadius, colliders) > 0)
                     {
-                        var hitPredictedPosition = body.CenterPosition + body.Particles[i].Predicted.With(y: 0f);
+                        var hitNormal = CalculateHitNormal(colliders, body.CenterPosition, body.Particles[i].Predicted);
+                        var hitPredictedPosition = predictedPosition + hitNormal * body.Particles[i].Predicted.magnitude;
                         var hitPosition = colliders[0].ClosestPointOnBounds(hitPredictedPosition);
-                        var hitNormal = (hitPredictedPosition - hitPosition).normalized;
-                        
+
                         body.AddContact(new Contact(i, hitPosition, hitNormal));
                     }
                 }
+            }
+
+            return;
+
+            Vector3 CalculateHitNormal(Collider[] colliders, Vector3 centerPosition, Vector3 predicted)
+            {
+                var predictedPosition = centerPosition + predicted;
+                
+                bool boundsContainsPoint = colliders[0].bounds.Contains(predictedPosition);
+                bool rayIntersectsWithCollider = Physics.Raycast(centerPosition, predicted.normalized, 
+                    out var hitInfo, predicted.magnitude);
+                
+                if (boundsContainsPoint && rayIntersectsWithCollider)
+                    return hitInfo.normal;
+                
+                return (predictedPosition - colliders[0].ClosestPointOnBounds(predictedPosition)).normalized;
             }
         }
 
