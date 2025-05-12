@@ -75,8 +75,7 @@ namespace SoftbodyPhysics
                     }
                     else if (Physics.OverlapSphereNonAlloc(predictedPosition, body.ParticlesRadius, colliders) > 0)
                     {
-                        var hitPredictedPosition = body.CenterPosition + new Vector3(body.Particles[i].Predicted.x, 0f, 
-                            body.Particles[i].Predicted.z);
+                        var hitPredictedPosition = body.CenterPosition + body.Particles[i].Predicted.With(y: 0f);
                         var hitPosition = colliders[0].ClosestPointOnBounds(hitPredictedPosition);
                         var hitNormal = (hitPredictedPosition - hitPosition).normalized;
                         
