@@ -12,7 +12,6 @@ namespace SoftbodyPhysics
 
         public abstract void GenerateCollisionConstraints();
         public abstract void ProjectConstraints();
-        public abstract void ResolvePenetrations();
 
         public abstract void UpdatePositions(float deltaTime);
         public abstract void UpdateVelocity(float deltaTime);

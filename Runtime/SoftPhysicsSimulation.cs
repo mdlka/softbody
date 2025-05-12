@@ -35,8 +35,6 @@ namespace SoftbodyPhysics
                 for (int i = 0; i < _solverIterations; i++)
                     _solver.ProjectConstraints();
                 
-                _solver.ResolvePenetrations(); // Kludge
-            
                 _solver.UpdatePositions(deltaTime);
                 _solver.UpdateVelocity(deltaTime);
             

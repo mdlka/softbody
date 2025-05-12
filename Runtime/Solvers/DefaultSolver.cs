@@ -75,8 +75,11 @@ namespace SoftbodyPhysics
                     }
                     else if (Physics.OverlapSphereNonAlloc(predictedPosition, body.ParticlesRadius, colliders) > 0)
                     {
-                        var hitPosition = colliders[0].ClosestPoint(predictedPosition);
-                        var hitNormal = (predictedPosition - hitPosition).normalized;
+                        var hitPredictedPosition = body.CenterPosition + new Vector3(body.Particles[i].Predicted.x, 0f, 
+                            body.Particles[i].Predicted.z);
+                        var hitPosition = colliders[0].ClosestPointOnBounds(hitPredictedPosition);
+                        var hitNormal = (hitPredictedPosition - hitPosition).normalized;
+                        
                         body.AddContact(new Contact(i, hitPosition, hitNormal));
                     }
                 }
@@ -90,30 +93,6 @@ namespace SoftbodyPhysics
                 Constraints.ApplyCollisionConstraint(body, _restCollisionDistance, _collisionConstraintStiffness);
                 Constraints.ApplyShapeMatchingConstraint(body, _shapeMatchingConstraintStiffness);
                 Constraints.ApplyBalloonsConstraint(body, _balloonsConstraintsStiffness, _pressureStiffness);
-            }
-        }
-
-        public override void ResolvePenetrations()
-        {
-            foreach (var body in _bodies)
-            {
-                var colliders = new Collider[1];
-            
-                foreach (var particle in body.Particles)
-                {
-                    if (Physics.OverlapSphereNonAlloc(body.CenterPosition + particle.Predicted, body.ParticlesRadius, colliders) == 0)
-                        continue;
-
-                    var closestPointOnBounds = colliders[0].ClosestPointOnBounds(body.CenterPosition + new Vector3(particle.Predicted.x, 0f, particle.Predicted.z));
-                    var closestPointInCollider = colliders[0].ClosestPoint(body.CenterPosition + particle.Predicted);
-                
-                    var rawDirection = closestPointOnBounds - closestPointInCollider;
-
-                    if (rawDirection.magnitude <= 0f) 
-                        continue;
-                
-                    particle.Predicted += rawDirection.normalized * (rawDirection.magnitude + _restCollisionDistance);
-                }
             }
         }
 
